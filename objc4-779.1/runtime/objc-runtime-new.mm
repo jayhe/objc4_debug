@@ -5668,8 +5668,9 @@ search_method_list_inline(const method_list_t *mlist, SEL sel)
 {
     int methodListIsFixedUp = mlist->isFixedUp();
     int methodListHasExpectedSize = mlist->entsize() == sizeof(method_t);
-    
+    // 有序的
     if (fastpath(methodListIsFixedUp && methodListHasExpectedSize)) {
+        // 二分查找
         return findMethodInSortedMethodList(sel, mlist);
     } else {
         // Linear search of unsorted method list
