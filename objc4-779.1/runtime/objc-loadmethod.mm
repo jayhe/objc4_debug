@@ -98,7 +98,7 @@ void add_category_to_loadable_list(Category cat)
     IMP method;
 
     loadMethodLock.assertLocked();
-
+    // 直接拿到load方法的imp
     method = _category_getLoadMethod(cat);
 
     // Don't bother if cat has no +load method
@@ -108,7 +108,7 @@ void add_category_to_loadable_list(Category cat)
         _objc_inform("LOAD: category '%s(%s)' scheduled for +load", 
                      _category_getClassName(cat), _category_getName(cat));
     }
-    
+    // 如果需要扩容，就扩容
     if (loadable_categories_used == loadable_categories_allocated) {
         loadable_categories_allocated = loadable_categories_allocated*2 + 16;
         loadable_categories = (struct loadable_category *)
@@ -116,7 +116,7 @@ void add_category_to_loadable_list(Category cat)
                               loadable_categories_allocated *
                               sizeof(struct loadable_category));
     }
-
+    // 将category的类以及imp存储在数组中
     loadable_categories[loadable_categories_used].cat = cat;
     loadable_categories[loadable_categories_used].method = method;
     loadable_categories_used++;

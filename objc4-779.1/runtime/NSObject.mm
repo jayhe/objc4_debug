@@ -82,7 +82,7 @@ namespace {
 #define SIDE_TABLE_WEAKLY_REFERENCED (1UL<<0)
 #define SIDE_TABLE_DEALLOCATING      (1UL<<1)  // MSB-ward of weak bit
 #define SIDE_TABLE_RC_ONE            (1UL<<2)  // MSB-ward of deallocating bit
-#define SIDE_TABLE_RC_PINNED         (1UL<<(WORD_BITS-1))
+#define SIDE_TABLE_RC_PINNED         (1UL<<(WORD_BITS-1)) // 64bit是64 32bit是32
 
 #define SIDE_TABLE_RC_SHIFT 2
 #define SIDE_TABLE_FLAG_MASK (SIDE_TABLE_RC_ONE-1)
@@ -338,7 +338,7 @@ storeWeak(id *location, objc_object *newObj)
 
         // Set is-weakly-referenced bit in refcount table.
         if (newObj  &&  !newObj->isTaggedPointer()) {
-            newObj->setWeaklyReferenced_nolock();
+            newObj->setWeaklyReferenced_nolock(); // 将对象的isa的weak标记位设置为1，此标记位在对象释放的时候去判断是否需要清空weak表中的entry
         }
 
         // Do not set *location anywhere else. That would introduce a race.
@@ -607,7 +607,7 @@ public:
 private:
 	static pthread_key_t const key = AUTORELEASE_POOL_KEY;
 	static uint8_t const SCRIBBLE = 0xA3;  // 0xA3A3A3A3 after releasing
-	static size_t const COUNT = SIZE / sizeof(id);
+	static size_t const COUNT = SIZE / sizeof(id); // 一页的大小除以对象指针的大小，就是最大可以存储的个数
 
     // EMPTY_POOL_PLACEHOLDER is stored in TLS when exactly one pool is 
     // pushed and it has never contained any objects. This saves memory 
@@ -722,7 +722,7 @@ private:
     }
 
     id * end() {
-        return (id *) ((uint8_t *)this+SIZE);
+        return (id *) ((uint8_t *)this+SIZE); // SIZE就是一页的大小
     }
 
     bool empty() {
@@ -757,24 +757,24 @@ private:
         // Not recursive: we don't want to blow out the stack 
         // if a thread accumulates a stupendous amount of garbage
         
-        while (this->next != stop) {
+        while (this->next != stop) { // 判断是否释放到了结束的对象
             // Restart from hotPage() every time, in case -release 
             // autoreleased more objects
-            AutoreleasePoolPage *page = hotPage();
+            AutoreleasePoolPage *page = hotPage(); // hotPage一般是链表的tail
 
             // fixme I think this `while` can be `if`, but I can't prove it
-            while (page->empty()) {
+            while (page->empty()) { // page空了，就取父节点
                 page = page->parent;
                 setHotPage(page);
             }
 
             page->unprotect();
-            id obj = *--page->next;
-            memset((void*)page->next, SCRIBBLE, sizeof(*page->next));
+            id obj = *--page->next; // 通过位置偏移从动态数组中取出obj
+            memset((void*)page->next, SCRIBBLE, sizeof(*page->next)); // 将这一块内存设置为SCRIBBLE
             page->protect();
 
             if (obj != POOL_BOUNDARY) {
-                objc_release(obj);
+                objc_release(obj); // 释放对象
             }
         }
 
@@ -839,7 +839,7 @@ private:
     static AutoreleasePoolPage *pageForPointer(uintptr_t p) 
     {
         AutoreleasePoolPage *result;
-        uintptr_t offset = p % SIZE;
+        uintptr_t offset = p % SIZE; // SIZE就是一个page的大小；
 
         ASSERT(offset >= sizeof(AutoreleasePoolPage));
 
@@ -893,12 +893,12 @@ private:
 
     static inline id *autoreleaseFast(id obj)
     {
-        AutoreleasePoolPage *page = hotPage();
-        if (page && !page->full()) {
-            return page->add(obj);
-        } else if (page) {
+        AutoreleasePoolPage *page = hotPage(); // 可以理解为上次添加obj的page
+        if (page && !page->full()) { // page有并且没有满
+            return page->add(obj); // 直接加到该page中
+        } else if (page) { // page满了
             return autoreleaseFullPage(obj, page);
-        } else {
+        } else { // 没有hotPage
             return autoreleaseNoPage(obj);
         }
     }
@@ -911,14 +911,14 @@ private:
         // Then add the object to that page.
         ASSERT(page == hotPage());
         ASSERT(page->full()  ||  DebugPoolAllocation);
-
+        // 遍历page的下一个节点，找到不满的那个退出循环
         do {
             if (page->child) page = page->child;
-            else page = new AutoreleasePoolPage(page);
+            else page = new AutoreleasePoolPage(page); // 遍历完了所有的节点，还是没找到不满的page则新建一个page，并且将新建的page的parent设置为传入的page
         } while (page->full());
 
-        setHotPage(page);
-        return page->add(obj);
+        setHotPage(page); // 设置hotPage为上面遍历找到的那个
+        return page->add(obj); // 将obj加到该page
     }
 
     static __attribute__((noinline))
@@ -929,14 +929,14 @@ private:
         ASSERT(!hotPage());
 
         bool pushExtraBoundary = false;
-        if (haveEmptyPoolPlaceholder()) {
+        if (haveEmptyPoolPlaceholder()) { // 有pool只是是个empty placeholder
             // We are pushing a second pool over the empty placeholder pool
             // or pushing the first object into the empty placeholder pool.
             // Before doing that, push a pool boundary on behalf of the pool 
             // that is currently represented by the empty placeholder.
             pushExtraBoundary = true;
         }
-        else if (obj != POOL_BOUNDARY  &&  DebugMissingPools) {
+        else if (obj != POOL_BOUNDARY  &&  DebugMissingPools) { // 没有pool并且obj不为空，抛出有内层泄漏的警告
             // We are pushing an object with no pool in place, 
             // and no-pool debugging was requested by environment.
             _objc_inform("MISSING POOLS: (%p) Object %p of class %s "
@@ -947,11 +947,11 @@ private:
             objc_autoreleaseNoPool(obj);
             return nil;
         }
-        else if (obj == POOL_BOUNDARY  &&  !DebugPoolAllocation) {
+        else if (obj == POOL_BOUNDARY  &&  !DebugPoolAllocation) { // 正在push pool
             // We are pushing a pool with no pool in place,
             // and alloc-per-pool debugging was not requested.
             // Install and return the empty pool placeholder.
-            return setEmptyPoolPlaceholder();
+            return setEmptyPoolPlaceholder(); // 设置空占位pool
         }
 
         // We are pushing an object or a non-placeholder'd pool.
@@ -983,9 +983,9 @@ public:
     {
         ASSERT(obj);
         ASSERT(!obj->isTaggedPointer());
-        id *dest __unused = autoreleaseFast(obj);
+        id *dest __unused = autoreleaseFast(obj); // 将对象加入到pool的page中
         ASSERT(!dest  ||  dest == EMPTY_POOL_PLACEHOLDER  ||  *dest == obj);
-        return obj;
+        return obj; // 返回原对象
     }
 
 
@@ -996,7 +996,7 @@ public:
             // Each autorelease pool starts on a new pool page.
             dest = autoreleaseNewPage(POOL_BOUNDARY);
         } else {
-            dest = autoreleaseFast(POOL_BOUNDARY);
+            dest = autoreleaseFast(POOL_BOUNDARY); // autoreleaseFast(nil)
         }
         ASSERT(dest == EMPTY_POOL_PLACEHOLDER || *dest == POOL_BOUNDARY);
         return dest;
@@ -1030,34 +1030,43 @@ public:
 
     template<bool allowDebug>
     static void
-    popPage(void *token, AutoreleasePoolPage *page, id *stop)
+    popPage(void *token, AutoreleasePoolPage *page, id *stop) // stop = (id *)token;
     {
         if (allowDebug && PrintPoolHiwat) printHiwat();
 
-        page->releaseUntil(stop);
+        page->releaseUntil(stop); //
 
         // memory: delete empty children
-        if (allowDebug && DebugPoolAllocation  &&  page->empty()) {
+        if (allowDebug && DebugPoolAllocation  &&  page->empty()) { // page为空
             // special case: delete everything during page-per-pool debugging
             AutoreleasePoolPage *parent = page->parent;
             page->kill();
-            setHotPage(parent);
-        } else if (allowDebug && DebugMissingPools  &&  page->empty()  &&  !page->parent) {
+            setHotPage(parent); // 将hotPage设置为该page的parent
+        } else if (allowDebug && DebugMissingPools  &&  page->empty()  &&  !page->parent) { // page为空并且是根节点
             // special case: delete everything for pop(top)
             // when debugging missing autorelease pools
             page->kill();
             setHotPage(nil);
-        } else if (page->child) {
+        } else if (page->child) { // page有子节点
             // hysteresis: keep one empty child if page is more than half full
-            if (page->lessThanHalfFull()) {
-                page->child->kill();
+            if (page->lessThanHalfFull()) { // page内容还未满一半，则将全部子节点干掉
+                page->child->kill(); // 从child节点开始遍历删除子节点
             }
-            else if (page->child->child) {
+            else if (page->child->child) { // page内容超过一半了，则保留一个空的子节点
                 page->child->child->kill();
             }
         }
     }
-
+    /*
+     __attribute__((unused))
+     表示函数的返回值必须被检查或使用，否则会警告。
+     __attribute__((used))
+     表示函数可能不会调用、可能用不到，编译器不要提醒
+     __attribute__((cold))
+     表示函数不经常调用
+     __attribute__((cleanup()))
+     可以定义一个变量，在他的作用域结束的时候会自动执行一个指定的方法，该方法执行在dealloc之前。
+     */
     __attribute__((noinline, cold))
     static void
     popPageDebug(void *token, AutoreleasePoolPage *page, id *stop)
@@ -1086,12 +1095,12 @@ public:
         }
 
         stop = (id *)token;
-        if (*stop != POOL_BOUNDARY) {
+        if (*stop != POOL_BOUNDARY) { // 如果不是pop到某一页的开始位置
             if (stop == page->begin()  &&  !page->parent) {
                 // Start of coldest page may correctly not be POOL_BOUNDARY:
                 // 1. top-level pool is popped, leaving the cold page in place
                 // 2. an object is autoreleased with no pool
-            } else {
+            } else { // 报异常
                 // Error. For bincompat purposes this is not 
                 // fatal in executables built with old SDKs.
                 return badPop(token);
@@ -1220,10 +1229,10 @@ objc_object::clearDeallocating_slow()
 
     SideTable& table = SideTables()[this];
     table.lock();
-    if (isa.weakly_referenced) {
+    if (isa.weakly_referenced) { // 有弱引用记录
         weak_clear_no_lock(&table.weak_table, (id)this);
     }
-    if (isa.has_sidetable_rc) {
+    if (isa.has_sidetable_rc) { // 有计数信息存储在sidetable
         table.refcnts.erase(this);
     }
     table.unlock();
@@ -1404,9 +1413,9 @@ objc_object::sidetable_retain()
     SideTable& table = SideTables()[this];
     
     table.lock();
-    size_t& refcntStorage = table.refcnts[this];
-    if (! (refcntStorage & SIDE_TABLE_RC_PINNED)) {
-        refcntStorage += SIDE_TABLE_RC_ONE;
+    size_t& refcntStorage = table.refcnts[this]; // 找对象存储在sidetable的计数信息
+    if (! (refcntStorage & SIDE_TABLE_RC_PINNED)) { // 如果存在并且没有超出可以表示的最大计数范围
+        refcntStorage += SIDE_TABLE_RC_ONE; // +1
     }
     table.unlock();
 
@@ -1530,16 +1539,27 @@ objc_object::sidetable_release(bool performDealloc)
     bool do_dealloc = false;
 
     table.lock();
-    auto it = table.refcnts.try_emplace(this, SIDE_TABLE_DEALLOCATING);
+    //try_emplace:https://en.cppreference.com/w/cpp/container/map/try_emplace
+    auto it = table.refcnts.try_emplace(this, SIDE_TABLE_DEALLOCATING); // try_emplace的作用是key对应的记录存在则啥都不做，不存在的话则将value存储到对应的key
     auto &refcnt = it.first->second;
-    if (it.second) {
+    if (it.second) { // there was no entry 没有记录，那么就直接dealloc
         do_dealloc = true;
-    } else if (refcnt < SIDE_TABLE_DEALLOCATING) {
+    } else if (refcnt < SIDE_TABLE_DEALLOCATING) { // 0b10
         // SIDE_TABLE_WEAKLY_REFERENCED may be set. Don't change it.
         do_dealloc = true;
         refcnt |= SIDE_TABLE_DEALLOCATING;
-    } else if (! (refcnt & SIDE_TABLE_RC_PINNED)) {
-        refcnt -= SIDE_TABLE_RC_ONE;
+    } else if (! (refcnt & SIDE_TABLE_RC_PINNED)) { // #define SIDE_TABLE_RC_PINNED         (1UL<<(WORD_BITS-1))
+        /*
+         举个例子使用WORD_BITS=8位来演算,假设sidetable存储的是0b100 == 4
+         SIDE_TABLE_RC_PINNED = 0b10000000
+         refcnt = 0b00010000
+         1. refcnt & SIDE_TABLE_RC_PINNED ==> 0b00010000 & 0b10000000 = 0b00000000
+         2. 只有当引用计数器的高位也为1的时候，才为真；此时溢出了，直接返回了false
+        */
+        refcnt -= SIDE_TABLE_RC_ONE; // 1UL<<2
+        // 假设sidetable存储的是0b100 == 4
+        // 0b00010000 - 0b100 = 0b00001100 ==> rc = 0b11 = 3
+        // 0b00001100 - 0b100 = 0b00001000 ==> rc = 0b10 = 2
     }
     table.unlock();
     if (do_dealloc  &&  performDealloc) {
@@ -1558,12 +1578,12 @@ objc_object::sidetable_clearDeallocating()
     // clear extra retain count and deallocating bit
     // (fixme warn or abort if extra retain count == 0 ?)
     table.lock();
-    RefcountMap::iterator it = table.refcnts.find(this);
-    if (it != table.refcnts.end()) {
-        if (it->second & SIDE_TABLE_WEAKLY_REFERENCED) {
-            weak_clear_no_lock(&table.weak_table, (id)this);
+    RefcountMap::iterator it = table.refcnts.find(this); // 从sidetable找该对象的记录
+    if (it != table.refcnts.end()) { // 找到了
+        if (it->second & SIDE_TABLE_WEAKLY_REFERENCED) { // 弱引用的标记位来判断是否有弱引用记录
+            weak_clear_no_lock(&table.weak_table, (id)this); // 清除弱引用表中的记录
         }
-        table.refcnts.erase(it);
+        table.refcnts.erase(it); // 将计数器从sidetable移除
     }
     table.unlock();
 }
@@ -1855,11 +1875,16 @@ _objc_rootHash(id obj)
 }
 
 void *
-objc_autoreleasePoolPush(void)
+objc_autoreleasePoolPush(void) // main函数中的@autoreleasepool {}会调用这个，出了它的作用域就会调用pop
 {
     return AutoreleasePoolPage::push();
 }
 
+// 1.pop的时机：线程退出或者线程即将进入休眠；
+// 2.主线程是常驻线程，一般是在即将进入休眠去释放，然后再push、或者程序退出的时候；由于在main函数的@autoreleasepool {} return的操作是一个循环
+// 这个不返回那么这个@autoreleasepool {}就没有出作用域；这也解释了为什么我们自己@autoreleasepool {}是出了作用域就pop了，跟main函数这里的在行为上看起来有差别
+// 3.子线程默认是没有开启runloop的，假如我们需要一个常驻线程，则需要在开启一个runloop，在runloop开启外层包一个@autoreleasepool {}
+//
 NEVER_INLINE
 void
 objc_autoreleasePoolPop(void *ctxt)
@@ -1909,29 +1934,29 @@ objc_retainAutoreleaseAndReturn(id obj)
 
 // Prepare a value at +1 for return through a +0 autoreleasing convention.
 id 
-objc_autoreleaseReturnValue(id obj)
+objc_autoreleaseReturnValue(id obj) // return [obj autorelease] ??
 {
-    if (prepareOptimizedReturn(ReturnAtPlus1)) return obj;
+    if (prepareOptimizedReturn(ReturnAtPlus1)) return obj; // 这里判断如果调用方是objc_retainAutoreleasedReturnValue，那么就说明外部是对obj retain操作，那么这里就不需要将对象加到autorelease中，然后外部调用方又去retain一下，直接返回回去该对象，节省了这些开销
 
     return objc_autorelease(obj);
 }
 
 // Prepare a value at +0 for return through a +0 autoreleasing convention.
 id 
-objc_retainAutoreleaseReturnValue(id obj)
+objc_retainAutoreleaseReturnValue(id obj) // return [[obj retain] autorelease] ??
 {
     if (prepareOptimizedReturn(ReturnAtPlus0)) return obj;
 
     // not objc_autoreleaseReturnValue(objc_retain(obj)) 
     // because we don't need another optimization attempt
-    return objc_retainAutoreleaseAndReturn(obj);
+    return objc_retainAutoreleaseAndReturn(obj); // objc_retainAutorelease(obj); --> objc_autorelease(objc_retain(obj));
 }
 
 // Accept a value returned through a +0 autoreleasing convention for use at +1.
 id
 objc_retainAutoreleasedReturnValue(id obj)
 {
-    if (acceptOptimizedReturn() == ReturnAtPlus1) return obj;
+    if (acceptOptimizedReturn() == ReturnAtPlus1) return obj; // 调用方去TSL中查找刚好标记位为true，那么就直接返回该对象了。省去了retain的操作
 
     return objc_retain(obj);
 }
@@ -1940,9 +1965,9 @@ objc_retainAutoreleasedReturnValue(id obj)
 id
 objc_unsafeClaimAutoreleasedReturnValue(id obj)
 {
-    if (acceptOptimizedReturn() == ReturnAtPlus0) return obj;
+    if (acceptOptimizedReturn() == ReturnAtPlus0) return obj; // 如果做了优化那么存储到TLS中的值是ReturnAtPlus1，表示没有进行autoreleasepool的操作，这个时候就需要调用方去release对象了，就走下面的流程了。
 
-    return objc_releaseAndReturn(obj);
+    return objc_releaseAndReturn(obj); // release(obj) and return obj
 }
 
 id

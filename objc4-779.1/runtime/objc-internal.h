@@ -355,7 +355,7 @@ _objc_getTaggedPointerSignedValue(const void * _Nullable ptr);
 #   define OBJC_MSB_TAGGED_POINTERS 0
 #else
     // Everything else - tag bit is MSB
-#   define OBJC_MSB_TAGGED_POINTERS 1
+#   define OBJC_MSB_TAGGED_POINTERS 1 // 最高有效位
 #endif
 
 #define _OBJC_TAG_INDEX_MASK 0x7
@@ -397,13 +397,15 @@ extern uintptr_t objc_debug_taggedpointer_obfuscator;
 static inline void * _Nonnull
 _objc_encodeTaggedPointer(uintptr_t ptr)
 {
-    return (void *)(objc_debug_taggedpointer_obfuscator ^ ptr);
+    return (void *)(objc_debug_taggedpointer_obfuscator ^ ptr); // objc_debug_taggedpointer_obfuscator 通过异或混淆一下指针的值
 }
-
+// 假设 objc_debug_taggedpointer_obfuscator位 0010
+// encode：1001 ^ 0010 = 1011
+// decode：1011 ^ 0010 = 1001
 static inline uintptr_t
 _objc_decodeTaggedPointer(const void * _Nullable ptr)
 {
-    return (uintptr_t)ptr ^ objc_debug_taggedpointer_obfuscator;
+    return (uintptr_t)ptr ^ objc_debug_taggedpointer_obfuscator; // 再次异或就得到了原始的值
 }
 
 static inline bool 

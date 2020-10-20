@@ -2496,7 +2496,7 @@ static Class realizeClassWithoutSwift(Class cls, Class previously)
     if (isMeta) {
         // Metaclasses do not need any features from non pointer ISA
         // This allows for a faspath for classes in objc_retain/objc_release.
-        cls->setInstancesRequireRawIsa();
+        cls->setInstancesRequireRawIsa(); // meta class不需要nonpointer isa
     } else {
         // Disable non-pointer isa for some classes and/or platforms.
         // Set instancesRequireRawIsa.
@@ -6026,7 +6026,7 @@ IMP lookUpImpOrForward(id inst, SEL sel, Class cls, int behavior)
         // runtimeLock may have been dropped but is now locked again
     }
 
-    if (slowpath((behavior & LOOKUP_INITIALIZE) && !cls->isInitialized())) {
+    if (slowpath((behavior & LOOKUP_INITIALIZE) && !cls->isInitialized())) { // 消息发送的时候，如果类没有初始化的情况，就会调用initializeAndLeaveLocked来初始化最后会调用callInitialize
         cls = initializeAndLeaveLocked(cls, inst, runtimeLock);
         // runtimeLock may have been dropped but is now locked again
 
@@ -7544,13 +7544,13 @@ void *objc_destructInstance(id obj)
 {
     if (obj) {
         // Read all of the flags at once for performance.
-        bool cxx = obj->hasCxxDtor();
-        bool assoc = obj->hasAssociatedObjects();
+        bool cxx = obj->hasCxxDtor(); // 是否有c++析构方法
+        bool assoc = obj->hasAssociatedObjects(); // 是否有关联对象
 
         // This order is important.
-        if (cxx) object_cxxDestruct(obj);
-        if (assoc) _object_remove_assocations(obj);
-        obj->clearDeallocating();
+        if (cxx) object_cxxDestruct(obj); // 调用c++析构函数
+        if (assoc) _object_remove_assocations(obj); // 移除关联对象
+        obj->clearDeallocating(); // 清除弱引用以及sidetable中的记录
     }
 
     return obj;
@@ -7727,9 +7727,11 @@ classSlotForTagIndex(objc_tag_index_t tag)
 * or retrieving payload values. They are filled with randomness on first
 * use.
 **********************************************************************/
+// map_images -- map_images_nolock -- _read_images -- initializeTaggedPointerObfuscator
 static void
 initializeTaggedPointerObfuscator(void)
 {
+    // 初始化一个taggedpointer的掩码，每次_objc_init的时候都生成一个
     if (sdkIsOlderThan(10_14, 12_0, 12_0, 5_0, 3_0) ||
         // Set the obfuscator to zero for apps linked against older SDKs,
         // in case they're relying on the tagged pointer representation.
@@ -7737,6 +7739,7 @@ initializeTaggedPointerObfuscator(void)
         objc_debug_taggedpointer_obfuscator = 0;
     } else {
         // Pull random data into the variable, then shift away all non-payload bits.
+        // 随机一个掩码，然后再做运算;基本上每次app启动获取到的都是不一样的
         arc4random_buf(&objc_debug_taggedpointer_obfuscator,
                        sizeof(objc_debug_taggedpointer_obfuscator));
         objc_debug_taggedpointer_obfuscator &= ~_OBJC_TAG_MASK;

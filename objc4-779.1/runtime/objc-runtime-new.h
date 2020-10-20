@@ -999,8 +999,8 @@ struct class_rw_t {
     property_array_t properties;
     protocol_array_t protocols;
 
-    Class firstSubclass;
-    Class nextSiblingClass;
+    Class firstSubclass; // 子类
+    Class nextSiblingClass; // 兄弟类
 
     char *demangledName;
 

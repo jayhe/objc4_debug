@@ -32,6 +32,8 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		10518D84241F83E800AE5265 /* TestClass.m in Sources */ = {isa = PBXBuildFile; fileRef = 10518D83241F83E800AE5265 /* TestClass.m */; };
+		1059F839248927A7005673C8 /* TestLock.m in Sources */ = {isa = PBXBuildFile; fileRef = 1059F838248927A7005673C8 /* TestLock.m */; };
 		393CEAC00DC69E3E000B69DE /* objc-references.mm in Sources */ = {isa = PBXBuildFile; fileRef = 393CEABF0DC69E3E000B69DE /* objc-references.mm */; };
 		393CEAC60DC69E67000B69DE /* objc-references.h in Headers */ = {isa = PBXBuildFile; fileRef = 393CEAC50DC69E67000B69DE /* objc-references.h */; };
 		39ABD72312F0B61800D1054C /* objc-weak.h in Headers */ = {isa = PBXBuildFile; fileRef = 39ABD71F12F0B61800D1054C /* objc-weak.h */; };
@@ -154,6 +156,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		10518D82241F83E800AE5265 /* TestClass.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TestClass.h; sourceTree = "<group>"; };
+		10518D83241F83E800AE5265 /* TestClass.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TestClass.m; sourceTree = "<group>"; };
+		1059F837248927A7005673C8 /* TestLock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TestLock.h; sourceTree = "<group>"; };
+		1059F838248927A7005673C8 /* TestLock.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = TestLock.m; sourceTree = "<group>"; };
 		393CEABF0DC69E3E000B69DE /* objc-references.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = "objc-references.mm"; path = "runtime/objc-references.mm"; sourceTree = "<group>"; };
 		393CEAC50DC69E67000B69DE /* objc-references.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "objc-references.h"; path = "runtime/objc-references.h"; sourceTree = "<group>"; };
 		39ABD71F12F0B61800D1054C /* objc-weak.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "objc-weak.h"; path = "runtime/objc-weak.h"; sourceTree = "<group>"; };
@@ -349,6 +355,15 @@
 			name = Source;
 			sourceTree = "<group>";
 		};
+		1059F8332489275C005673C8 /* Lock */ = {
+			isa = PBXGroup;
+			children = (
+				1059F837248927A7005673C8 /* TestLock.h */,
+				1059F838248927A7005673C8 /* TestLock.m */,
+			);
+			path = Lock;
+			sourceTree = "<group>";
+		};
 		1AB674ADFE9D54B511CA2CBB /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -362,7 +377,10 @@
 		6F8ADBF32314D1F300E235A9 /* objc-debug */ = {
 			isa = PBXGroup;
 			children = (
+				1059F8332489275C005673C8 /* Lock */,
 				6F8ADBF42314D1F300E235A9 /* main.m */,
+				10518D82241F83E800AE5265 /* TestClass.h */,
+				10518D83241F83E800AE5265 /* TestClass.m */,
 			);
 			path = "objc-debug";
 			sourceTree = "<group>";
@@ -684,6 +702,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				10518D84241F83E800AE5265 /* TestClass.m in Sources */,
+				1059F839248927A7005673C8 /* TestLock.m in Sources */,
 				6F8ADBF52314D1F300E235A9 /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

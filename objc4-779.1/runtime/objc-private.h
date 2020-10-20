@@ -81,7 +81,21 @@ union isa_t {
 
 struct objc_object {
 private:
-    isa_t isa;
+    /*
+     union isa_t {
+         isa_t() { }
+         isa_t(uintptr_t value) : bits(value) { }
+
+         Class cls;
+         uintptr_t bits;
+     #if defined(ISA_BITFIELD)
+         struct {
+             ISA_BITFIELD;  // defined in isa.h
+         };
+     #endif
+     };
+     */
+    isa_t isa; // pointer isa会用指针来展示各种标记位
 
 public:
 

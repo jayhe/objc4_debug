@@ -288,7 +288,7 @@ int objc_sync_enter(id obj)
     if (obj) {
         SyncData* data = id2data(obj, ACQUIRE);
         assert(data);
-        data->mutex.lock();
+        data->mutex.lock(); // recursive_mutex_t
     } else {
         // @synchronized(nil) does nothing
         if (DebugNilSync) {

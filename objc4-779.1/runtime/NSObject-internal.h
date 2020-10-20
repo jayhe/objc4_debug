@@ -124,11 +124,11 @@ class AutoreleasePoolPage;
 struct AutoreleasePoolPageData
 {
 	magic_t const magic;
-	__unsafe_unretained id *next;
+	__unsafe_unretained id *next; // 对象指针
 	pthread_t const thread;
-	AutoreleasePoolPage * const parent;
-	AutoreleasePoolPage *child;
-	uint32_t const depth;
+	AutoreleasePoolPage * const parent; // 前一页
+	AutoreleasePoolPage *child; // 后一页
+	uint32_t const depth; // 链表长度
 	uint32_t hiwat;
 
 	AutoreleasePoolPageData(__unsafe_unretained id* _next, pthread_t _thread, AutoreleasePoolPage* _parent, uint32_t _depth, uint32_t _hiwat)

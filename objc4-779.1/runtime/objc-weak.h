@@ -84,12 +84,12 @@ struct weak_entry_t {
             weak_referrer_t *referrers;
             uintptr_t        out_of_line_ness : 2;
             uintptr_t        num_refs : PTR_MINUS_2;
-            uintptr_t        mask;
+            uintptr_t        mask; // mask的值为数组个数大小-1
             uintptr_t        max_hash_displacement;
         };
         struct {
             // out_of_line_ness field is low bits of inline_referrers[1]
-            weak_referrer_t  inline_referrers[WEAK_INLINE_COUNT];
+            weak_referrer_t  inline_referrers[WEAK_INLINE_COUNT];//4
         };
     };
 
@@ -105,6 +105,7 @@ struct weak_entry_t {
     weak_entry_t(objc_object *newReferent, objc_object **newReferrer)
         : referent(newReferent)
     {
+        // weak_entry初始化函数
         inline_referrers[0] = newReferrer;
         for (int i = 1; i < WEAK_INLINE_COUNT; i++) {
             inline_referrers[i] = nil;

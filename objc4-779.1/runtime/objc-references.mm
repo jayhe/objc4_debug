@@ -68,7 +68,7 @@ public:
     inline void acquireValue() {
         if (_value) {
             switch (_policy & 0xFF) {
-            case OBJC_ASSOCIATION_SETTER_RETAIN:
+            case OBJC_ASSOCIATION_SETTER_RETAIN: // 1
                 _value = objc_retain(_value);
                 break;
             case OBJC_ASSOCIATION_SETTER_COPY:
@@ -79,13 +79,32 @@ public:
     }
 
     inline void releaseHeldValue() {
-        if (_value && (_policy & OBJC_ASSOCIATION_SETTER_RETAIN)) {
+        if (_value && (_policy & OBJC_ASSOCIATION_SETTER_RETAIN)) { // retain or retain_nonatomic都会执行
             objc_release(_value);
         }
     }
-
-    inline void retainReturnedValue() {
-        if (_value && (_policy & OBJC_ASSOCIATION_GETTER_RETAIN)) {
+    /*
+     typedef OBJC_ENUM(uintptr_t, objc_AssociationPolicy) {
+         OBJC_ASSOCIATION_ASSIGN = 0,
+         OBJC_ASSOCIATION_RETAIN_NONATOMIC = 1,
+         OBJC_ASSOCIATION_COPY_NONATOMIC = 3,
+         OBJC_ASSOCIATION_RETAIN = 01401,
+         OBJC_ASSOCIATION_COPY = 01403
+     };
+     // retain_nonatomic
+     (lldb) p 1 & 1<<8
+     (int) $0 = 0
+     (lldb) p 1 & 2<<8
+     (int) $1 = 0
+     // retain
+     (lldb) p 01401 & 1<<8
+     (int) $0 = 256
+     (lldb) p 01401 & 2<<8
+     (int) $1 = 512
+     (lldb)
+     */
+    inline void retainReturnedValue() { // retain_nonatomic的不会走objc_retain而retain的policy则会执行
+        if (_value && (_policy & OBJC_ASSOCIATION_GETTER_RETAIN)) { // OBJC_ASSOCIATION_GETTER_RETAIN = 1<<8
             objc_retain(_value);
         }
     }
@@ -178,7 +197,7 @@ _object_set_associative_reference(id object, const void *key, id value, uintptr_
 
         if (value) {
             auto refs_result = associations.try_emplace(disguised, ObjectAssociationMap{});
-            if (refs_result.second) {
+            if (refs_result.second) { // second = true
                 /* it's the first association we make */
                 object->setHasAssociatedObjects();
             }
@@ -195,7 +214,7 @@ _object_set_associative_reference(id object, const void *key, id value, uintptr_
                 auto &refs = refs_it->second;
                 auto it = refs.find(key);
                 if (it != refs.end()) {
-                    association.swap(it->second);
+                    association.swap(it->second); // 交换2个值，如果之前已经设置过key对应的数据
                     refs.erase(it);
                     if (refs.size() == 0) {
                         associations.erase(refs_it);

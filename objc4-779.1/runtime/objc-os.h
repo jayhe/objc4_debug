@@ -161,7 +161,7 @@ addc(uintptr_t lhs, uintptr_t rhs, uintptr_t carryin, uintptr_t *carryout)
 static ALWAYS_INLINE uintptr_t 
 subc(uintptr_t lhs, uintptr_t rhs, uintptr_t carryin, uintptr_t *carryout)
 {
-    return __builtin_subcl(lhs, rhs, carryin, carryout);
+    return __builtin_subcl(lhs, rhs, carryin, carryout); // http://clang.llvm.org/docs/LanguageExtensions.html#checked-arithmetic-builtins
 }
 
 #if __arm64__ && !__arm64e__
