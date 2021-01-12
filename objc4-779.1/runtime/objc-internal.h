@@ -358,24 +358,24 @@ _objc_getTaggedPointerSignedValue(const void * _Nullable ptr);
 #   define OBJC_MSB_TAGGED_POINTERS 1 // 最高有效位
 #endif
 
-#define _OBJC_TAG_INDEX_MASK 0x7
+#define _OBJC_TAG_INDEX_MASK 0x7 // 0b111表示有扩展的标记位，扩展标记位占8位
 // array slot includes the tag bit itself
 #define _OBJC_TAG_SLOT_COUNT 16
-#define _OBJC_TAG_SLOT_MASK 0xf
+#define _OBJC_TAG_SLOT_MASK 0xf // 0b1111 taggedpointer + 有扩展标记位的mask
 
 #define _OBJC_TAG_EXT_INDEX_MASK 0xff
 // array slot has no extra bits
-#define _OBJC_TAG_EXT_SLOT_COUNT 256
-#define _OBJC_TAG_EXT_SLOT_MASK 0xff
+#define _OBJC_TAG_EXT_SLOT_COUNT 256 // 扩展标记位能表示的个数
+#define _OBJC_TAG_EXT_SLOT_MASK 0xff // 0b1111 1111
 
 #if OBJC_MSB_TAGGED_POINTERS
-#   define _OBJC_TAG_MASK (1UL<<63)
-#   define _OBJC_TAG_INDEX_SHIFT 60
+#   define _OBJC_TAG_MASK (1UL<<63) // 是否是tagged pointer的标记位 1表示是 0表示不是
+#   define _OBJC_TAG_INDEX_SHIFT 60 // 基础tag位的偏移，从2-4bit，结合_OBJC_TAG_INDEX_MASK来获取到基础tag的值
 #   define _OBJC_TAG_SLOT_SHIFT 60
-#   define _OBJC_TAG_PAYLOAD_LSHIFT 4
+#   define _OBJC_TAG_PAYLOAD_LSHIFT 4 // LSHIFT和RSHIFT配合使用用来对数据移位混淆及恢复
 #   define _OBJC_TAG_PAYLOAD_RSHIFT 4
-#   define _OBJC_TAG_EXT_MASK (0xfUL<<60)
-#   define _OBJC_TAG_EXT_INDEX_SHIFT 52
+#   define _OBJC_TAG_EXT_MASK (0xfUL<<60) // 1111 0000 ... 0000 0000 是否有扩展标记位 tag位111表示有扩展标记位
+#   define _OBJC_TAG_EXT_INDEX_SHIFT 52 // 扩展tag位的偏移，从5-12bit共8位，结合_OBJC_TAG_EXT_INDEX_MASK来获取扩展tag的值
 #   define _OBJC_TAG_EXT_SLOT_SHIFT 52
 #   define _OBJC_TAG_EXT_PAYLOAD_LSHIFT 12
 #   define _OBJC_TAG_EXT_PAYLOAD_RSHIFT 12
@@ -452,9 +452,9 @@ _objc_getTaggedPointerTag(const void * _Nullable ptr)
 {
     // ASSERT(_objc_isTaggedPointer(ptr));
     uintptr_t value = _objc_decodeTaggedPointer(ptr);
-    uintptr_t basicTag = (value >> _OBJC_TAG_INDEX_SHIFT) & _OBJC_TAG_INDEX_MASK;
-    uintptr_t extTag =   (value >> _OBJC_TAG_EXT_INDEX_SHIFT) & _OBJC_TAG_EXT_INDEX_MASK;
-    if (basicTag == _OBJC_TAG_INDEX_MASK) {
+    uintptr_t basicTag = (value >> _OBJC_TAG_INDEX_SHIFT) & _OBJC_TAG_INDEX_MASK; // 读取基础tag的值
+    uintptr_t extTag =   (value >> _OBJC_TAG_EXT_INDEX_SHIFT) & _OBJC_TAG_EXT_INDEX_MASK; // 获取扩展tag的值
+    if (basicTag == _OBJC_TAG_INDEX_MASK) { // 如果基础tag的值是0b111表示有扩展tag
         return (objc_tag_index_t)(extTag + OBJC_TAG_First52BitPayload);
     } else {
         return (objc_tag_index_t)basicTag;

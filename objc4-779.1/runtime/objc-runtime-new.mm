@@ -1241,7 +1241,8 @@ prepareMethodLists(Class cls, method_list_t **addedLists, int addedCount,
 // oldest categories first.
 static void
 attachCategories(Class cls, const locstamped_category_t *cats_list, uint32_t cats_count,
-                 int flags)
+                 int flags) // HC:all loaded and sorted by load order,
+// oldest categories first.后编译的放在后面，后附加到原类上去。
 {
     if (slowpath(PrintReplacedMethods)) {
         printReplacements(cls, cats_list, cats_count);
@@ -1276,7 +1277,7 @@ attachCategories(Class cls, const locstamped_category_t *cats_list, uint32_t cat
 
     for (uint32_t i = 0; i < cats_count; i++) {
         auto& entry = cats_list[i];
-
+        // HC:attatch methods
         method_list_t *mlist = entry.cat->methodsForMeta(isMeta);
         if (mlist) {
             if (mcount == ATTACH_BUFSIZ) {
@@ -1287,7 +1288,7 @@ attachCategories(Class cls, const locstamped_category_t *cats_list, uint32_t cat
             mlists[ATTACH_BUFSIZ - ++mcount] = mlist;
             fromBundle |= entry.hi->isBundle();
         }
-
+        // HC:attatch properties
         property_list_t *proplist =
             entry.cat->propertiesForMeta(isMeta, entry.hi);
         if (proplist) {
@@ -1297,7 +1298,7 @@ attachCategories(Class cls, const locstamped_category_t *cats_list, uint32_t cat
             }
             proplists[ATTACH_BUFSIZ - ++propcount] = proplist;
         }
-
+        // HC:attatch protocol
         protocol_list_t *protolist = entry.cat->protocolsForMeta(isMeta);
         if (protolist) {
             if (protocount == ATTACH_BUFSIZ) {
@@ -2134,8 +2135,8 @@ static void addSubclass(Class supercls, Class subcls)
 
         objc_debug_realized_class_generation_count++;
         
-        subcls->data()->nextSiblingClass = supercls->data()->firstSubclass;
-        supercls->data()->firstSubclass = subcls;
+        subcls->data()->nextSiblingClass = supercls->data()->firstSubclass; // 兄弟类
+        supercls->data()->firstSubclass = subcls; // 子类
 
         if (supercls->hasCxxCtor()) {
             subcls->setHasCxxCtor();
@@ -2371,6 +2372,7 @@ static void reconcileInstanceVariables(Class cls, Class supercls, const class_ro
             
             // Find max ivar alignment in class.
             // default to word size to simplify ivar update
+            // 找出实例列表中最大的对齐方式
             uint32_t alignment = 1<<WORD_SHIFT;
             if (ro->ivars) {
                 for (const auto& ivar : *ro->ivars) {
@@ -2406,7 +2408,7 @@ static void reconcileInstanceVariables(Class cls, Class supercls, const class_ro
     }
     // fixme can optimize for "class has no new ivars", etc
 
-    if (ro->instanceStart < super_ro->instanceSize) {
+    if (ro->instanceStart < super_ro->instanceSize) { // instanceSize是对齐之后的大小
         // Superclass has changed size. This class's ivars must move.
         // Also slide layout bits in parallel.
         // This code is incapable of compacting the subclass to 
@@ -2433,7 +2435,7 @@ static void reconcileInstanceVariables(Class cls, Class supercls, const class_ro
 * Returns the real class structure for the class. 
 * Locking: runtimeLock must be write-locked by the caller
 **********************************************************************/
-static Class realizeClassWithoutSwift(Class cls, Class previously)
+static Class realizeClassWithoutSwift(Class cls, Class previously) // 初始化类
 {
     runtimeLock.assertLocked();
 
@@ -2444,26 +2446,26 @@ static Class realizeClassWithoutSwift(Class cls, Class previously)
     bool isMeta;
 
     if (!cls) return nil;
-    if (cls->isRealized()) return cls;
+    if (cls->isRealized()) return cls; // 如果类已经初始化过就直接返回
     ASSERT(cls == remapClass(cls));
 
     // fixme verify class is not in an un-dlopened part of the shared cache?
 
     ro = (const class_ro_t *)cls->data();
-    if (ro->flags & RO_FUTURE) {
+    if (ro->flags & RO_FUTURE) { // 将来的类
         // This was a future class. rw data is already allocated.
         rw = cls->data();
         ro = cls->data()->ro;
         cls->changeInfo(RW_REALIZED|RW_REALIZING, RW_FUTURE);
     } else {
         // Normal class. Allocate writeable class data.
-        rw = (class_rw_t *)calloc(sizeof(class_rw_t), 1);
+        rw = (class_rw_t *)calloc(sizeof(class_rw_t), 1); // 开辟空间初始化rw信息
         rw->ro = ro;
         rw->flags = RW_REALIZED|RW_REALIZING;
         cls->setData(rw);
     }
 
-    isMeta = ro->flags & RO_META;
+    isMeta = ro->flags & RO_META; // 是否是meta class
 #if FAST_CACHE_META
     if (isMeta) cls->cache.setBit(FAST_CACHE_META);
 #endif
@@ -2496,7 +2498,7 @@ static Class realizeClassWithoutSwift(Class cls, Class previously)
     if (isMeta) {
         // Metaclasses do not need any features from non pointer ISA
         // This allows for a faspath for classes in objc_retain/objc_release.
-        cls->setInstancesRequireRawIsa(); // meta class不需要nonpointer isa
+        cls->setInstancesRequireRawIsa(); // meta class不需要nonpointer isa，需要使用raw isa
     } else {
         // Disable non-pointer isa for some classes and/or platforms.
         // Set instancesRequireRawIsa.
@@ -2533,8 +2535,8 @@ static Class realizeClassWithoutSwift(Class cls, Class previously)
 #endif
 
     // Update superclass and metaclass in case of remapping
-    cls->superclass = supercls;
-    cls->initClassIsa(metacls);
+    cls->superclass = supercls; // 设置supercls
+    cls->initClassIsa(metacls); // 将类的isa设置为meta class
 
     // Reconcile instance variable offsets / layout.
     // This may reallocate class_ro_t, updating our ro variable.
@@ -2560,9 +2562,9 @@ static Class realizeClassWithoutSwift(Class cls, Class previously)
     }
 
     // Connect this class to its superclass's subclass lists
-    if (supercls) {
+    if (supercls) { // 有父类则去设置继承链以及兄弟链
         addSubclass(supercls, cls);
-    } else {
+    } else { // 没有父类说明是根
         addRootClass(cls);
     }
 
@@ -2711,6 +2713,7 @@ realizeClassMaybeSwiftMaybeRelock(Class cls, mutex_t& lock, bool leaveLocked)
     if (!cls->isSwiftStable_ButAllowLegacyForNow()) {
         // Non-Swift class. Realize it now with the lock still held.
         // fixme wrong in the future for objc subclasses of swift classes
+        // 代码是在text段readonly的，由于oc的运行时特性，我们往往会修改一个类，这时候就需要实例化rw的类结构出来
         realizeClassWithoutSwift(cls, nil);
         if (!leaveLocked) lock.unlock();
     } else {
@@ -2774,19 +2777,19 @@ static void realizeAllClassesInImage(header_info *hi)
 
     size_t count, i;
     classref_t const *classlist;
+    
+    if (hi->areAllClassesRealized()) return; // 已经实例化过
 
-    if (hi->areAllClassesRealized()) return;
-
-    classlist = _getObjc2ClassList(hi, &count);
+    classlist = _getObjc2ClassList(hi, &count); // 获取image的类列表
 
     for (i = 0; i < count; i++) {
-        Class cls = remapClass(classlist[i]);
+        Class cls = remapClass(classlist[i]); // 返回cls的类指针，它可能指向被重新分配的类结构。如果cls因为弱链接而被忽略，返回nil。
         if (cls) {
             realizeClassMaybeSwiftAndLeaveLocked(cls, runtimeLock);
         }
     }
 
-    hi->setAllClassesRealized(YES);
+    hi->setAllClassesRealized(YES); // 设置标记位
 }
 
 
@@ -3523,9 +3526,9 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
                     // Then, rebuild the class's method lists (etc) if
                     // the class is realized.
                     if (cat->instanceMethods ||  cat->protocols
-                        ||  cat->instanceProperties)
+                        ||  cat->instanceProperties) // HC:如果分类有方法、协议、属性就需要去attatch到原类中去
                     {
-                        if (cls->isRealized()) {
+                        if (cls->isRealized()) { // HC:类还未初始化
                             attachCategories(cls, &lc, 1, ATTACH_EXISTING);
                         } else {
                             objc::unattachedCategories.addForClass(lc, cls);
@@ -3700,13 +3703,13 @@ void prepare_load_methods(const headerType *mhdr)
     size_t count, i;
 
     runtimeLock.assertLocked();
-
+    // HC:先去获取类的load方法
     classref_t const *classlist = 
         _getObjc2NonlazyClassList(mhdr, &count);
     for (i = 0; i < count; i++) {
-        schedule_class_load(remapClass(classlist[i]));
+        schedule_class_load(remapClass(classlist[i])); // HC:schedule会递归去找父类的load方法，这样保证调用load的时候会先调用父类的
     }
-
+    // HC:直接从DATA段__objc_nlcatlist中获取，__objc_catlist的数据已经在read_images中获取了
     category_t * const *categorylist = _getObjc2NonlazyCategoryList(mhdr, &count);
     for (i = 0; i < count; i++) {
         category_t *cat = categorylist[i];
@@ -3739,7 +3742,8 @@ void _unload_image(header_info *hi)
 
     // Ignore __objc_catlist2. We don't support unloading Swift
     // and we never will.
-    category_t * const *catlist = _getObjc2CategoryList(hi, &count);
+    // HC:获取分类列表
+    category_t * const *catlist = _getObjc2CategoryList(hi, &count); // HC:这里取出来的顺序就是编译的顺序
     for (i = 0; i < count; i++) {
         category_t *cat = catlist[i];
         Class cls = remapClass(cat->cls);
@@ -7035,13 +7039,13 @@ static void objc_initializeClassPair_internal(Class superclass, const char *name
     cls->initClassIsa(meta);
 
     if (superclass) {
-        meta->initClassIsa(superclass->ISA()->ISA());
+        meta->initClassIsa(superclass->ISA()->ISA()); // meta cls 的isa都指向根meta
         cls->superclass = superclass;
         meta->superclass = superclass->ISA();
         addSubclass(superclass, cls);
         addSubclass(superclass->ISA(), meta);
     } else {
-        meta->initClassIsa(meta);
+        meta->initClassIsa(meta); // 根meta的isa指向自己
         cls->superclass = Nil;
         meta->superclass = cls;
         addRootClass(cls);

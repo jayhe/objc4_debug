@@ -924,7 +924,9 @@ void _objc_init(void)
     exception_init();
     cache_init();
     _imp_implementationWithBlock_init();
-
+    // load_images主要是收集load方法然后调用
+    //
+    // 
     _dyld_objc_notify_register(&map_images, load_images, unmap_image);
 }
 

@@ -689,7 +689,7 @@ struct protocol_list_t {
         return list + count;
     }
 };
-
+// read only 存储了类的实例大小信息及实例开始位置变量的布局信息，这也是为什么类可以运行时增加属性而不能增加实例的原因，分配的空间大小已经类信息初始化就确定好了。
 struct class_ro_t {
     uint32_t flags;
     uint32_t instanceStart;
@@ -880,7 +880,7 @@ class list_array_tt {
             return &list;
         }
     }
-
+    // HC:这里是将方法列表附加到类去
     void attachLists(List* const * addedLists, uint32_t addedCount) {
         if (addedCount == 0) return;
 
@@ -890,8 +890,10 @@ class list_array_tt {
             uint32_t newCount = oldCount + addedCount;
             setArray((array_t *)realloc(array(), array_t::byteSize(newCount)));
             array()->count = newCount;
+            // HC:将原类中的方法列表移动到数组的尾部
             memmove(array()->lists + addedCount, array()->lists, 
                     oldCount * sizeof(array()->lists[0]));
+            // HC:将需要添加的方法二维数组放到数组的前面
             memcpy(array()->lists, addedLists, 
                    addedCount * sizeof(array()->lists[0]));
         }
@@ -986,7 +988,7 @@ class protocol_array_t :
     }
 };
 
-
+// read write内部保存着方法列表、属性列表、协议列表等信息，而且内存是分配在dirty memory；这样就能支持runtime运行时去修改这些信息
 struct class_rw_t {
     // Be warned that Symbolication knows the layout of this structure.
     uint32_t flags;
