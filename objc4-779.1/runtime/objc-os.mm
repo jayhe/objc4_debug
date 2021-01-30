@@ -925,8 +925,8 @@ void _objc_init(void)
     cache_init();
     _imp_implementationWithBlock_init();
     // load_images主要是收集load方法然后调用
-    //
-    // 
+    // map_images主要是readImages初始化类并且将分类的方法协议属性等attatch过来
+    // unmap_image跟map_images相反，将分类unattatch并且从load类列表中移除
     _dyld_objc_notify_register(&map_images, load_images, unmap_image);
 }
 
