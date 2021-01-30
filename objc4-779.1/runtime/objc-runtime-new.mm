@@ -3675,7 +3675,7 @@ void _read_images(header_info **hList, uint32_t hCount, int totalClasses, int un
 **********************************************************************/
 // Recursively schedule +load for cls and any un-+load-ed superclasses.
 // cls must already be connected.
-static void schedule_class_load(Class cls)
+static void schedule_class_load(Class cls) // HC:递归找父类的load并加到数组中去，这样父类的就在数组的后面
 {
     if (!cls) return;
     ASSERT(cls->isRealized());  // _read_images should realize
@@ -3709,7 +3709,8 @@ void prepare_load_methods(const headerType *mhdr)
     for (i = 0; i < count; i++) {
         schedule_class_load(remapClass(classlist[i])); // HC:schedule会递归去找父类的load方法，这样保证调用load的时候会先调用父类的
     }
-    // HC:直接从DATA段__objc_nlcatlist中获取，__objc_catlist的数据已经在read_images中获取了
+    // HC:直接从DATA段__objc_nlcatlist中获取，__objc_catlist的数据已经在read_images中获取了；分类的load的加载顺序
+    // 就跟编译的顺序有关了，先编译的先执行
     category_t * const *categorylist = _getObjc2NonlazyCategoryList(mhdr, &count);
     for (i = 0; i < count; i++) {
         category_t *cat = categorylist[i];
@@ -3721,7 +3722,7 @@ void prepare_load_methods(const headerType *mhdr)
         }
         realizeClassWithoutSwift(cls, nil);
         ASSERT(cls->ISA()->isRealized());
-        add_category_to_loadable_list(cat);
+        add_category_to_loadable_list(cat); // HC:将load方法按照data段中的顺序依次添加到数组中去
     }
 }
 
@@ -5172,7 +5173,7 @@ objc_class::getLoadMethod()
     ASSERT(!isMetaClass());
     ASSERT(ISA()->isMetaClass());
 
-    mlist = ISA()->data()->ro->baseMethods();
+    mlist = ISA()->data()->ro->baseMethods(); // HC:ro类的baseMethods存的是原始的方法列表,而rw中的方法列表则是attatch之后的，分类在前原类的在后
     if (mlist) {
         for (const auto& meth : *mlist) {
             const char *name = sel_cname(meth.name);
@@ -6030,7 +6031,7 @@ IMP lookUpImpOrForward(id inst, SEL sel, Class cls, int behavior)
         // runtimeLock may have been dropped but is now locked again
     }
 
-    if (slowpath((behavior & LOOKUP_INITIALIZE) && !cls->isInitialized())) { // 消息发送的时候，如果类没有初始化的情况，就会调用initializeAndLeaveLocked来初始化最后会调用callInitialize
+    if (slowpath((behavior & LOOKUP_INITIALIZE) && !cls->isInitialized())) { //HC: 消息发送的时候，如果类没有初始化的情况，就会调用initializeAndLeaveLocked来初始化最后会调用callInitialize
         cls = initializeAndLeaveLocked(cls, inst, runtimeLock);
         // runtimeLock may have been dropped but is now locked again
 

@@ -497,7 +497,7 @@ void initializeNonMetaClass(Class cls)
 
     Class supercls;
     bool reallyInitialize = NO;
-
+    // HC:递归去调用保证父类没有被Initialized的都会去调用initialize
     // Make sure super is done initializing BEFORE beginning to initialize cls.
     // See note about deadlock above.
     supercls = cls->superclass;
@@ -551,7 +551,7 @@ void initializeNonMetaClass(Class cls)
         @try
 #endif
         {
-            callInitialize(cls);
+            callInitialize(cls); // HC: ((void(*)(Class, SEL))objc_msgSend)(cls, @selector(initialize));直接走的objc_msgSend
 
             if (PrintInitializing) {
                 _objc_inform("INITIALIZE: thread %p: finished +[%s initialize]",

@@ -65,7 +65,7 @@ void add_class_to_loadable_list(Class cls)
 
     loadMethodLock.assertLocked();
 
-    method = cls->getLoadMethod();
+    method = cls->getLoadMethod(); // HC:从ro的baseMethods方法列表得到类的load方法
     if (!method) return;  // Don't bother if cls has no +load method
     
     if (PrintLoading) {
@@ -98,7 +98,7 @@ void add_category_to_loadable_list(Category cat)
     IMP method;
 
     loadMethodLock.assertLocked();
-    // 直接拿到load方法的imp
+    // HC:直接拿到load方法的imp
     method = _category_getLoadMethod(cat);
 
     // Don't bother if cat has no +load method
@@ -108,7 +108,7 @@ void add_category_to_loadable_list(Category cat)
         _objc_inform("LOAD: category '%s(%s)' scheduled for +load", 
                      _category_getClassName(cat), _category_getName(cat));
     }
-    // 如果需要扩容，就扩容
+    // HC:如果需要扩容，就扩容
     if (loadable_categories_used == loadable_categories_allocated) {
         loadable_categories_allocated = loadable_categories_allocated*2 + 16;
         loadable_categories = (struct loadable_category *)
@@ -349,11 +349,13 @@ void call_load_methods(void)
 
     do {
         // 1. Repeatedly call class +loads until there aren't any more
+        // HC:先调用类的load方法
         while (loadable_classes_used > 0) {
             call_class_loads();
         }
 
         // 2. Call category +loads ONCE
+        // HC:调用分类中的load方法
         more_categories = call_category_loads();
 
         // 3. Run more +loads if there are classes OR more untried categories

@@ -892,10 +892,10 @@ class list_array_tt {
             array()->count = newCount;
             // HC:将原类中的方法列表移动到数组的尾部
             memmove(array()->lists + addedCount, array()->lists, 
-                    oldCount * sizeof(array()->lists[0]));
+                    oldCount * sizeof(array()->lists[0])); // void    *memmove(void *__dst, const void *__src, size_t __len);
             // HC:将需要添加的方法二维数组放到数组的前面
             memcpy(array()->lists, addedLists, 
-                   addedCount * sizeof(array()->lists[0]));
+                   addedCount * sizeof(array()->lists[0])); // void    *memcpy(void *__dst, const void *__src, size_t __n);
         }
         else if (!list  &&  addedCount == 1) {
             // 0 lists -> 1 list
